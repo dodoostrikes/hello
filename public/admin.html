@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Admin Panel</title>
+  <style>
+    body{font-family:sans-serif;background:#0b1020;color:#e8ecf2;padding:20px}
+    .btn{padding:6px 10px;margin:2px;border:none;border-radius:6px;cursor:pointer}
+    .danger{background:#ff7a7a;color:#000}
+    .neon{background:linear-gradient(90deg,#7c5cff,#2dd4bf);color:#000}
+    table{border-collapse:collapse;width:100%;margin-top:20px}
+    td,th{border:1px solid #444;padding:6px;word-break:break-word}
+    h1{color:#2dd4bf}
+  </style>
+</head>
+<body>
+  <h1>Admin Panel</h1>
+  <div id="loginBox">
+    <input id="user" placeholder="Admin user"/><br>
+    <input id="pass" placeholder="Password" type="password"/><br>
+    <button class="btn neon" onclick="adminLogin()">Login</button>
+  </div>
+  <div id="panel" style="display:none">
+    <button class="btn neon" onclick="loadPosts()">Load Posts</button>
+    <button class="btn neon" onclick="loadUsers()">Load Users</button>
+    <button class="btn danger" onclick="logout()">Logout</button>
+    <div id="content"></div>
+  </div>
+
+<script>
+let token = localStorage.getItem('adminToken') || '';
+
+if(token){
+  document.getElementById('loginBox').style.display='none';
+  document.getElementById('panel').style.display='block';
+}
+
+async function adminLogin(){
+  const user=document.getElementById('user').value;
+  const pass=document.getElementById('pass').value;
+  const r=await fetch('/api/admin/login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username:user,password:pass})
+  });
+  const d=await r.json();
+  if(d.token){
+    token=d.token;
+    localStorage.setItem('adminToken',token);
+    document.getElementById('loginBox').style.display='none';
+    document.getElementById('panel').style.display='block';
+  } else alert('bad creds');
+}
+
+function logout(){
+  token='';
+  localStorage.removeItem('adminToken');
+  document.getElementById('panel').style.display='none';
+  document.getElementById('loginBox').style.display='block';
+}
+
+async function loadPosts(){
+  const r=await fetch('/api/admin/pastes',{headers:{Authorization:'Bearer '+token}});
+  const d=await r.json();
+  let html='<h2>Posts</h2><table><tr><th>ID</th><th>User</th><th>Content</th><th>IP</th><th></th></tr>';
+  d.forEach(p=>{
+    html+=`<tr>
+             <td>${p.id}</td>
+             <td>${p.username}</td>
+             <td>${p.content}</td>
+             <td>${p.ip}</td>
+             <td><button class='btn danger' onclick='delPost(${p.id})'>Delete</button></td>
+           </tr>`;
+  });
+  html+='</table>';
+  document.getElementById('content').innerHTML=html;
+}
+
+async function delPost(id){
+  await fetch('/api/admin/pastes/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+  loadPosts();
+}
+
+async function loadUsers(){
+  const r=await fetch('/api/admin/users',{headers:{Authorization:'Bearer '+token}});
+  const d=await r.json();
+  let html='<h2>Users</h2><table><tr><th>ID</th><th>Username</th><th>IP</th><th>Created</th><th>Actions</th></tr>';
+  Object.values(d).forEach(u=>{
+    html+=`<tr>
+             <td>${u.id || u.ID}</td>
+             <td>${u.username || u.Username}</td>
+             <td>${u.ip || u.IP}</td>
+             <td>${u.created || u.Created}</td>
+             <td>
+               <button class='btn danger' onclick='banUser("${u.username||u.Username}")'>Ban User</button>
+               <button class='btn danger' onclick='banIp("${u.ip||u.IP}")'>Ban IP</button>
+             </td>
+           </tr>`;
+  });
+  html+='</table>';
+  document.getElementById('content').innerHTML=html;
+}
+
+async function banUser(username){
+  await fetch('/api/admin/ban/user/'+username,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  alert('User banned: '+username);
+  loadUsers();
+}
+
+async function banIp(ip){
+  await fetch('/api/admin/ban/ip/'+ip,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  alert('IP banned: '+ip);
+  loadUsers();
+}
+</script>
+</body>
+</html>
