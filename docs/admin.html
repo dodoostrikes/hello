@@ -4,13 +4,13 @@
   <meta charset="utf-8"/>
   <title>Admin Panel</title>
   <style>
-    body{font-family:sans-serif;background:#0b1020;color:#e8ecf2;padding:20px}
-    .btn{padding:6px 10px;margin:2px;border:none;border-radius:6px;cursor:pointer}
-    .danger{background:#ff7a7a;color:#000}
-    .neon{background:linear-gradient(90deg,#7c5cff,#2dd4bf);color:#000}
-    table{border-collapse:collapse;width:100%;margin-top:20px}
-    td,th{border:1px solid #444;padding:6px;word-break:break-word}
-    h1{color:#2dd4bf}
+    body { font-family:sans-serif; background:#0b1020; color:#e8ecf2; padding:20px }
+    .btn { padding:6px 10px; margin:2px; border:none; border-radius:6px; cursor:pointer }
+    .danger { background:#ff7a7a; color:#000 }
+    .neon { background:linear-gradient(90deg,#7c5cff,#2dd4bf); color:#000 }
+    table { border-collapse:collapse; width:100%; margin-top:20px }
+    td,th { border:1px solid #444; padding:6px; word-break:break-word }
+    h1 { color:#2dd4bf }
   </style>
 </head>
 <body>
@@ -28,6 +28,9 @@
   </div>
 
 <script>
+// 🔑 Explicit base API URL
+const API_BASE = 'https://hello-production-b4d6.up.railway.app';
+
 let token = localStorage.getItem('adminToken') || '';
 
 if(token){
@@ -38,7 +41,7 @@ if(token){
 async function adminLogin(){
   const user=document.getElementById('user').value;
   const pass=document.getElementById('pass').value;
-  const r=await fetch('/api/admin/login',{
+  const r=await fetch(`${API_BASE}/api/admin/login`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({username:user,password:pass})
@@ -60,7 +63,9 @@ function logout(){
 }
 
 async function loadPosts(){
-  const r=await fetch('/api/admin/pastes',{headers:{Authorization:'Bearer '+token}});
+  const r=await fetch(`${API_BASE}/api/admin/pastes`,{
+    headers:{Authorization:'Bearer '+token}
+  });
   const d=await r.json();
   let html='<h2>Posts</h2><table><tr><th>ID</th><th>User</th><th>Content</th><th>IP</th><th></th></tr>';
   d.forEach(p=>{
@@ -77,23 +82,28 @@ async function loadPosts(){
 }
 
 async function delPost(id){
-  await fetch('/api/admin/pastes/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+  await fetch(`${API_BASE}/api/admin/pastes/${id}`,{
+    method:'DELETE',
+    headers:{Authorization:'Bearer '+token}
+  });
   loadPosts();
 }
 
 async function loadUsers(){
-  const r=await fetch('/api/admin/users',{headers:{Authorization:'Bearer '+token}});
+  const r=await fetch(`${API_BASE}/api/admin/users`,{
+    headers:{Authorization:'Bearer '+token}
+  });
   const d=await r.json();
   let html='<h2>Users</h2><table><tr><th>ID</th><th>Username</th><th>IP</th><th>Created</th><th>Actions</th></tr>';
-  Object.values(d).forEach(u=>{
+  Object.entries(d).forEach(([username,u])=>{
     html+=`<tr>
-             <td>${u.id || u.ID}</td>
-             <td>${u.username || u.Username}</td>
-             <td>${u.ip || u.IP}</td>
-             <td>${u.created || u.Created}</td>
+             <td>${u.id}</td>
+             <td>${username}</td>
+             <td>${u.ip}</td>
+             <td>${u.created}</td>
              <td>
-               <button class='btn danger' onclick='banUser("${u.username||u.Username}")'>Ban User</button>
-               <button class='btn danger' onclick='banIp("${u.ip||u.IP}")'>Ban IP</button>
+               <button class='btn danger' onclick='banUser("${username}")'>Ban User</button>
+               <button class='btn danger' onclick='banIp("${u.ip}")'>Ban IP</button>
              </td>
            </tr>`;
   });
@@ -102,13 +112,19 @@ async function loadUsers(){
 }
 
 async function banUser(username){
-  await fetch('/api/admin/ban/user/'+username,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  await fetch(`${API_BASE}/api/admin/ban/user/${username}`,{
+    method:'POST',
+    headers:{Authorization:'Bearer '+token}
+  });
   alert('User banned: '+username);
   loadUsers();
 }
 
 async function banIp(ip){
-  await fetch('/api/admin/ban/ip/'+ip,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  await fetch(`${API_BASE}/api/admin/ban/ip/${ip}`,{
+    method:'POST',
+    headers:{Authorization:'Bearer '+token}
+  });
   alert('IP banned: '+ip);
   loadUsers();
 }
