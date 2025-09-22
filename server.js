@@ -1,4 +1,4 @@
-// server.js (or index.js depending on your project)
+// server.js (your full Express app)
 
 // --- Imports
 const express = require('express');
@@ -7,7 +7,7 @@ const sqlite3 = require('sqlite3').verbose();
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
-const cors = require('cors');   // 🚀 NEW
+const cors = require('cors');
 
 // --- Config
 const SECRET = 'supersecretkey'; // ⚠️ change this in production!
@@ -16,8 +16,11 @@ const ADMIN_PASS = 'cr1msonr3fused';
 
 const app = express();
 
-// --- Middleware
-app.use(cors());                 // ✅ allow cross‑origin requests
+// ✅ Trust Railway's proxy so req.ip = real client IP
+app.set('trust proxy', true);
+
+// ✅ Allow cross-origin requests (fixes your CORS issues)
+app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -86,7 +89,12 @@ app.post('/api/register', (req, res) => {
   const token = jwt.sign({ username }, SECRET);
   const id = generateId();
 
-  users[username] = { id, secret, created: new Date().toISOString(), ip: req.ip };
+  users[username] = {
+    id,
+    secret,
+    created: new Date().toISOString(),
+    ip: req.ip            // ✅ now real public IP
+  };
   saveUsers(users);
 
   return res.json({ username, secret, token, id });
