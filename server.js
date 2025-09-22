@@ -1,21 +1,28 @@
+// server.js (or index.js depending on your project)
+
+// --- Imports
 const express = require('express');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
+const cors = require('cors');   // 🚀 NEW
 
-const SECRET = 'supersecretkey'; // obviously change this in production
+// --- Config
+const SECRET = 'supersecretkey'; // ⚠️ change this in production!
 const ADMIN_USER = 'HallowByThyName';
 const ADMIN_PASS = 'cr1msonr3fused';
 
 const app = express();
+
+// --- Middleware
+app.use(cors());                 // ✅ allow cross‑origin requests
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// --- Database
 const db = new sqlite3.Database(path.join(__dirname, 'db.sqlite'));
-
-// Ensure posts table
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,7 +33,7 @@ db.serialize(() => {
   )`);
 });
 
-// Json file for user secrets
+// --- User storage
 const usersFile = path.join(__dirname, 'users.json');
 if (!fs.existsSync(usersFile)) {
   fs.writeFileSync(usersFile, JSON.stringify({}));
@@ -38,11 +45,11 @@ function saveUsers(users) {
   fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
 }
 
-// Bans
+// --- Bans
 let bannedUsers = new Set();
 let bannedIps = new Set();
 
-// Utils
+// --- Utils
 function generateId() {
   return Math.floor(1000000000 + Math.random() * 9000000000).toString();
 }
@@ -50,7 +57,7 @@ function nowTs() {
   return Math.floor(Date.now() / 1000);
 }
 
-// Middleware auth
+// --- Middleware auth
 function auth(req, res, next) {
   const auth = req.headers['authorization'];
   if (!auth) return res.status(401).json({ error: 'no token' });
@@ -61,12 +68,12 @@ function auth(req, res, next) {
     if (bannedIps.has(req.ip)) return res.status(403).json({ error: 'ip banned' });
     req.user = decoded;
     next();
-  } catch (e) {
+  } catch {
     return res.status(401).json({ error: 'invalid token' });
   }
 }
 
-// Register
+// --- Public API
 app.post('/api/register', (req, res) => {
   const { username } = req.body;
   if (!username) return res.status(400).json({ error: 'username required' });
@@ -85,7 +92,6 @@ app.post('/api/register', (req, res) => {
   return res.json({ username, secret, token, id });
 });
 
-// Login
 app.post('/api/login', (req, res) => {
   const { username, secret } = req.body;
   if (!username || !secret) return res.status(400).json({ error: 'missing' });
@@ -99,7 +105,6 @@ app.post('/api/login', (req, res) => {
   return res.json({ token });
 });
 
-// Create post
 app.post('/api/pastes', auth, (req, res) => {
   const { content } = req.body;
   if (!content) return res.status(400).json({ error: 'empty' });
@@ -115,7 +120,6 @@ app.post('/api/pastes', auth, (req, res) => {
   );
 });
 
-// List posts
 app.get('/api/pastes', (req, res) => {
   db.all('SELECT * FROM posts ORDER BY id DESC LIMIT 100', [], (err, rows) => {
     if (err) return res.status(500).json({ error: 'db error' });
@@ -123,7 +127,7 @@ app.get('/api/pastes', (req, res) => {
   });
 });
 
-// Admin login
+// --- Admin auth
 app.post('/api/admin/login', (req, res) => {
   const { username, password } = req.body;
   if (username === ADMIN_USER && password === ADMIN_PASS) {
@@ -141,41 +145,45 @@ function adminAuth(req, res, next) {
     const dec = jwt.verify(token, SECRET);
     if (!dec.admin) throw Error('not admin');
     next();
-  } catch (e) {
+  } catch {
     return res.status(401).json({ error: 'invalid admin token' });
   }
 }
 
-// Admin endpoints
+// --- Admin endpoints
 app.get('/api/admin/pastes', adminAuth, (req, res) => {
   db.all('SELECT * FROM posts ORDER BY id DESC', [], (err, rows) => {
     if (err) return res.status(500).json({ error: 'db error' });
     res.json(rows);
   });
 });
+
 app.delete('/api/admin/pastes/:id', adminAuth, (req, res) => {
   db.run('DELETE FROM posts WHERE id=?', [req.params.id], function (err) {
     if (err) return res.status(500).json({ error: 'db error' });
     res.json({ success: true });
   });
 });
+
 app.get('/api/admin/users', adminAuth, (req, res) => {
   try {
     const users = loadUsers();
     res.json(users);
-  } catch (e) {
+  } catch {
     res.json({});
   }
 });
+
 app.post('/api/admin/ban/user/:username', adminAuth, (req, res) => {
   bannedUsers.add(req.params.username);
   res.json({ success: true });
 });
+
 app.post('/api/admin/ban/ip/:ip', adminAuth, (req, res) => {
   bannedIps.add(req.params.ip);
   res.json({ success: true });
 });
 
-// Start
+// --- Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server running at http://localhost:' + PORT));
